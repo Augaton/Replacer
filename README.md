@@ -97,4 +97,7 @@ La CI recupere AugatonLib par `actions/checkout` sur le depot
 defaut. Le declenchement manuel de `release` permet de fixer une autre version
 via l'entree `augatonlib_ref`.
 
-Gitleaks tourne sur chaque push et bloque en cas de secret detecte.
+Gitleaks scanne l'historique complet a chaque push et bloque en cas de secret
+detecte. Il est invoque en binaire plutot que via son action GitHub : l'action
+calcule une plage de commits `<precedent>^..<actuel>` qui echoue sur le commit
+initial d'un depot.

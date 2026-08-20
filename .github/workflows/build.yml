@@ -14,18 +14,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Recuperer le plugin
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: plugin
 
       - name: Recuperer AugatonLib
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Augaton/AugatonLib
           ref: ${{ env.AUGATONLIB_REF }}
           path: augatonlib
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 
@@ -37,7 +37,7 @@ jobs:
       - name: Verifier la sortie
         run: test -f out/Replacer.dll
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Replacer
           path: out/Replacer.dll
@@ -46,9 +46,16 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Installer gitleaks
+        run: |
+          curl -sSLo /tmp/gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install /tmp/gitleaks /usr/local/bin/gitleaks
+
+      - name: Chercher des secrets
+        run: gitleaks git . --redact --no-banner --exit-code 1

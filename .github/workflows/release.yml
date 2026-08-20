@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag a publier"
+        description: "Tag a publier (doit exister)"
         required: true
       augatonlib_ref:
         description: "Version d'AugatonLib a embarquer"
@@ -19,20 +19,24 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
       - name: Recuperer le plugin
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: plugin
+          fetch-depth: 0
 
       - name: Recuperer AugatonLib
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Augaton/AugatonLib
           ref: ${{ github.event.inputs.augatonlib_ref || 'main' }}
           path: augatonlib
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 
@@ -54,35 +58,41 @@ jobs:
           cp out/Replacer.dll package/Plugins/7777/
           cp outlib/AugatonLib.dll package/Plugins/dependencies/
           cp plugin/README.md plugin/NOTICE.md package/ 2>/dev/null || true
-          cd package && zip -r ../Replacer.zip .
+          (cd package && zip -qr ../Replacer.zip .)
+
+      - name: Rediger les notes
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Installation
+
+          Extraire `Replacer.zip` dans `.config/EXILED/` : l'archive contient deja
+          la bonne arborescence.
+
+          ```
+          Plugins/7777/Replacer.dll
+          Plugins/dependencies/AugatonLib.dll
+          ```
+
+          **AugatonLib est obligatoire.** Elle est incluse dans l'archive et doit
+          etre placee dans `Plugins/dependencies/`, jamais dans `Plugins/7777/`.
+
+          Si d'autres plugins de la collection sont installes, garder la version
+          d'AugatonLib la plus recente : ils la partagent tous.
+
+          ## Dependances externes
+
+          - [HintServiceMeow](https://github.com/MeowServer/HintServiceMeow) dans
+            `Plugins/7777/`
+          NOTES
+          echo "" >> notes.md
+          echo "AugatonLib embarquee : \`${{ steps.lib.outputs.sha }}\`" >> notes.md
 
       - name: Publier
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: |
-            Replacer.zip
-            out/Replacer.dll
-            outlib/AugatonLib.dll
-          body: |
-            ## Installation
-
-            Extraire `Replacer.zip` dans `.config/EXILED/` : l'archive contient
-            deja la bonne arborescence.
-
-            ```
-            Plugins/7777/Replacer.dll
-            Plugins/dependencies/AugatonLib.dll
-            ```
-
-            **AugatonLib est obligatoire.** Elle est incluse dans l'archive
-            (version `${{ steps.lib.outputs.sha }}`) et doit etre placee dans
-            `Plugins/dependencies/`, jamais dans `Plugins/7777/`.
-
-            Si d'autres plugins de la collection sont installes, garder la
-            version d'AugatonLib la plus recente : ils partagent tous la meme.
-
-            ## Dependances externes
-
-            - [HintServiceMeow](https://github.com/MeowServer/HintServiceMeow)
-              dans `Plugins/7777/`
+        run: |
+          FILES="Replacer.zip out/Replacer.dll outlib/AugatonLib.dll"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" $FILES --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" $FILES --repo "$GITHUB_REPOSITORY" \
+              --title "Replacer $TAG" --notes-file notes.md
+          fi
