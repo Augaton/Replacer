@@ -2,9 +2,11 @@
 
   <PropertyGroup>
     <GameRefs>$(PkgExiled_Dev_References)\lib\net48</GameRefs>
+    <CommonProject Condition=" '$(CommonProject)' == '' ">$(MSBuildThisFileDirectory)..\ZoneShilari.Common\src\ZoneShilari.Common.csproj</CommonProject>
+    <CommonProject Condition="!Exists('$(CommonProject)')">$(MSBuildThisFileDirectory)ZoneShilari.Common\src\ZoneShilari.Common.csproj</CommonProject>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(PkgExiled_Dev_References)' != '' ">
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net48' Or '$(TargetFramework)' == 'net472' ">
     <Reference Include="Assembly-CSharp-firstpass" HintPath="$(GameRefs)\Assembly-CSharp-firstpass.dll" Private="false" />
     <Reference Include="Mirror" HintPath="$(GameRefs)\Mirror.dll" Private="false" />
     <Reference Include="Pooling" HintPath="$(GameRefs)\Pooling.dll" Private="false" />
@@ -15,5 +17,14 @@
     <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GameRefs)\UnityEngine.InputLegacyModule.dll" Private="false" />
     <Reference Include="Unity.TextMeshPro" HintPath="$(GameRefs)\Unity.TextMeshPro.dll" Private="false" />
   </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseZoneShilariCommon)' == 'true' And Exists('$(CommonProject)') ">
+    <ProjectReference Include="$(CommonProject)" Private="false" />
+  </ItemGroup>
+
+  <Target Name="WarnMissingCommon" BeforeTargets="Build"
+          Condition=" '$(UseZoneShilariCommon)' == 'true' And !Exists('$(CommonProject)') ">
+    <Error Text="ZoneShilari.Common introuvable. Clonez le depot ZoneShilari.Common a cote de ce depot, ou passez -p:CommonProject=chemin/vers/ZoneShilari.Common.csproj" />
+  </Target>
 
 </Project>

@@ -5,6 +5,7 @@
     <LangVersion>9.0</LangVersion>
     <AssemblyName>Replacer</AssemblyName>
     <RootNamespace>Replacer</RootNamespace>
+    <UseZoneShilariCommon>true</UseZoneShilariCommon>
     <Version>2.0.0</Version>
     <Configurations>Debug;Release</Configurations>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -16,7 +17,6 @@
 
   <ItemGroup>
     <PackageReference Include="ExMod.Exiled" Version="9.14.2" PrivateAssets="all" ExcludeAssets="runtime" />
-    <PackageReference Include="HintServiceMeow-Exiled" Version="5.5.0" PrivateAssets="all" ExcludeAssets="runtime" />
   </ItemGroup>
 
 </Project>
