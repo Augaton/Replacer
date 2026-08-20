@@ -19,7 +19,9 @@ namespace Replacer.Commands
 
         public override void LoadGeneratedCommands()
         {
-            RegisterCommand(new StatusCommand("Replacer", "2.1.0", Permission, builder =>
+            RegisterCommand(new StatusCommand(
+                "Replacer",
+                typeof(Plugin), Permission, builder =>
             {
                 Config config = Plugin.Instance.Config;
                 builder.AppendLine($"  file equitable : {(config.UseFairQueue ? "activee" : "desactivee")}");

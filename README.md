@@ -87,26 +87,34 @@ d'AugatonLib la plus recente : elle est partagee par tous.
 
 ## Integration continue
 
-`build` et `release` sont deux **workflows distincts**, pas deux etapes du meme.
+`build` et `release` sont deux **workflows distincts**.
 
 | Workflow | Declencheur | Produit |
 |---|---|---|
-| `build` | push sur `main`, pull request | Un artefact de run, visible dans l'onglet Actions |
-| `release` | push d'un **tag `v*`**, ou lancement manuel | Une **release** avec la DLL et l'archive |
+| `build` | push sur `main`, pull request | Compile, cree le tag si besoin, declenche la release |
+| `release` | tag `v*`, ou lancement manuel | Une **release** avec la DLL et l'archive |
 
-Un push sur `main` ne declenche donc que `build` : ses deux jobs `build` et
-`secrets` sont les seuls visibles. `release` n'apparait dans l'historique
-qu'apres un tag.
+### Publication automatique
 
-Pour publier :
+Le job `tag` de `build` lit la balise `<Version>` du `.csproj`. Si le tag
+`v<version>` n'existe pas encore, il le cree et declenche `release`.
+
+Publier revient donc a **incrementer `<Version>` dans le `.csproj`** puis
+pousser sur `main`. Sans changement de version, aucun tag n'est cree et aucune
+release n'est publiee : les commits de correction ne generent pas de bruit.
+
+La version affichee par `status` en jeu est lue dans l'assembly, elle-meme
+issue de cette meme balise. Le tag, la DLL et l'affichage en jeu ne peuvent
+donc pas diverger.
+
+### Publication manuelle
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.0 && git push origin v1.0.0
 ```
 
-Ou depuis l'onglet Actions, workflow `release`, bouton **Run workflow** en
-saisissant le tag : il sera cree s'il n'existe pas.
+Ou onglet Actions, workflow `release`, bouton **Run workflow** : le tag est cree
+s'il n'existe pas.
 
 La CI recupere AugatonLib par `actions/checkout` sur le depot
 [Augaton/AugatonLib](https://github.com/Augaton/AugatonLib), branche `main` par
