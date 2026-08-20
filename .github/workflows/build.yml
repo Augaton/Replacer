@@ -1,0 +1,54 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  AUGATONLIB_REF: main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recuperer le plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Recuperer AugatonLib
+        uses: actions/checkout@v4
+        with:
+          repository: Augaton/AugatonLib
+          ref: ${{ env.AUGATONLIB_REF }}
+          path: augatonlib
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Compiler
+        run: >
+          dotnet build plugin/Replacer.csproj -c Release -o out
+          -p:CommonProject=${{ github.workspace }}/augatonlib/src/AugatonLib.csproj
+
+      - name: Verifier la sortie
+        run: test -f out/Replacer.dll
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Replacer
+          path: out/Replacer.dll
+          if-no-files-found: error
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

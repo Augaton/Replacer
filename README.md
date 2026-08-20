@@ -69,3 +69,32 @@ Toutes les commandes de la collection partagent le meme socle : verification de
 permission en premiere ligne, arguments bornes en longueur, exceptions
 capturees, actions a impact tracees avec l'auteur. Une commande parente sans
 argument liste ses sous-commandes.
+
+## Installation depuis une release
+
+Chaque tag `v*` declenche une release qui publie une archive **contenant deja
+AugatonLib**. Extraire `Replacer.zip` dans `.config/EXILED/` :
+
+```
+Plugins/7777/Replacer.dll
+Plugins/dependencies/AugatonLib.dll
+```
+
+Les DLL sont aussi publiees separement pour une mise a jour ciblee.
+
+Si plusieurs plugins de la collection sont installes, garder la version
+d'AugatonLib la plus recente : elle est partagee par tous.
+
+## Integration continue
+
+| Workflow | Declencheur | Role |
+|---|---|---|
+| `build` | push sur `main`, pull request | Compile le plugin contre AugatonLib et verifie la sortie |
+| `release` | tag `v*` | Compile, empaquette avec AugatonLib et publie la release |
+
+La CI recupere AugatonLib par `actions/checkout` sur le depot
+[Augaton/AugatonLib](https://github.com/Augaton/AugatonLib), branche `main` par
+defaut. Le declenchement manuel de `release` permet de fixer une autre version
+via l'entree `augatonlib_ref`.
+
+Gitleaks tourne sur chaque push et bloque en cas de secret detecte.
