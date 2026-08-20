@@ -1,0 +1,257 @@
+name: release
+
+# Contrat : un push sur main dont le <Version> du .csproj n'a pas encore de tag
+# declenche la release. Meme version = build de verification, pas de release.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Identifier le projet
+        id: proj
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t projects < <(find . -name '*.csproj' -not -path '*/obj/*' -not -path '*/bin/*' | sort)
+          if [ "${#projects[@]}" -ne 1 ]; then
+            echo "::error::attendu exactement un .csproj, trouve ${#projects[@]}"
+            printf '  %s\n' "${projects[@]:-aucun}"
+            exit 1
+          fi
+          csproj="${projects[0]}"
+
+          extract() { sed -n "s:.*<$1>\(.*\)</$1>.*:\1:p" "$csproj" | head -1; }
+
+          name=$(extract AssemblyName)
+          version=$(extract Version)
+          exiled=$(sed -n 's:.*ExMod\.Exiled"[^>]*Version="\([^"]*\)".*:\1:p' "$csproj" | head -1)
+
+          [ -n "$name" ]    || { echo "::error::<AssemblyName> absent de $csproj"; exit 1; }
+          [ -n "$version" ] || { echo "::error::<Version> absent de $csproj"; exit 1; }
+
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::version invalide: '$version'"
+            exit 1
+          fi
+
+          {
+            echo "csproj=$csproj"
+            echo "dir=$(dirname "$csproj")"
+            echo "name=$name"
+            echo "version=$version"
+            echo "exiled=${exiled:-inconnue}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "$name $version (EXILED ${exiled:-inconnue})"
+
+      - name: Verifier la coherence des versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version='${{ steps.proj.outputs.version }}'
+          src=$(grep -rl 'override Version Version' --include='*.cs' . \
+                  --exclude-dir=obj --exclude-dir=bin | head -1)
+
+          if [ -z "$src" ]; then
+            echo "::warning::aucun 'override Version Version' trouve, verification ignoree"
+            exit 0
+          fi
+
+          declared=$(awk '
+            /override[[:space:]]+Version[[:space:]]+Version/ { hit = 1 }
+            hit && match($0, /new Version\([^)]*\)/) {
+              print substr($0, RSTART + 12, RLENGTH - 13)
+              exit
+            }
+          ' "$src" | tr -d '[:space:]' | tr ',' '.')
+
+          if [ -z "$declared" ]; then
+            echo "::error file=$src::version du plugin illisible dans $src"
+            exit 1
+          fi
+
+          pad() { IFS=. read -r a b c _ <<< "${1%%-*}"; echo "${a:-0}.${b:-0}.${c:-0}"; }
+
+          if [ "$(pad "$declared")" != "$(pad "$version")" ]; then
+            echo "::error file=$src::$src declare $declared, le .csproj declare $version"
+            exit 1
+          fi
+
+          echo "$src et le .csproj sont d'accord sur $version"
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/nuget
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        shell: bash
+        run: |
+          dotnet restore '${{ steps.proj.outputs.csproj }}' \
+            -p:RestorePackagesPath='${{ runner.temp }}/nuget'
+
+      - name: Build Release
+        shell: bash
+        run: |
+          dotnet build '${{ steps.proj.outputs.csproj }}' \
+            -c Release --no-restore \
+            -p:RestorePackagesPath='${{ runner.temp }}/nuget' \
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Localiser la DLL
+        id: dll
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dll='${{ steps.proj.outputs.dir }}/bin/Release/${{ steps.proj.outputs.name }}.dll'
+          if [ ! -f "$dll" ]; then
+            echo "::error::DLL introuvable: $dll"
+            find '${{ steps.proj.outputs.dir }}/bin' -name '*.dll' 2>/dev/null || true
+            exit 1
+          fi
+
+          mkdir -p artifacts
+          cp "$dll" artifacts/
+          (cd artifacts && sha256sum '${{ steps.proj.outputs.name }}.dll' > SHA256SUMS.txt)
+
+          echo "path=artifacts/${{ steps.proj.outputs.name }}.dll" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(cut -d' ' -f1 artifacts/SHA256SUMS.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.proj.outputs.name }}-${{ steps.proj.outputs.version }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Faut-il publier ?
+        id: gate
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          tag='v${{ steps.proj.outputs.version }}'
+
+          if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null \
+             || gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag existe deja, pas de release (bump <Version> dans le .csproj)"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Rediger le changelog
+        id: notes
+        if: steps.gate.outputs.release == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version='${{ steps.proj.outputs.version }}'
+          body=''
+
+          if [ -f CHANGELOG.md ]; then
+            body=$(awk -v v="$version" '
+              /^##[[:space:]]/ {
+                if (found) exit
+                header = $0
+                gsub(/[][]/, "", header)
+                if (header ~ ("^##[[:space:]]+v?" v "([^0-9]|$)")) { found = 1 }
+                next
+              }
+              found { print }
+            ' CHANGELOG.md | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac)
+          fi
+
+          if [ -z "$body" ]; then
+            prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+            if [ -n "$prev" ]; then
+              range="$prev..HEAD"
+              echo "changelog depuis $prev"
+            else
+              range=''
+              echo "premiere release, historique complet"
+            fi
+            body=$(git log --no-merges --reverse --pretty=format:'- %s (%h)' ${range:+$range})
+          fi
+
+          [ -n "$body" ] || body='- Pas de changement documente.'
+
+          {
+            echo "## ${{ steps.proj.outputs.name }} v$version"
+            echo
+            echo "$body"
+            echo
+            echo '### Installation'
+            echo
+            echo '1. Telecharger `${{ steps.proj.outputs.name }}.dll` ci-dessous.'
+            echo '2. Le deposer dans `.config/EXILED/Plugins/7777/`.'
+            echo '3. `reload plugins` en console, ou redemarrer le serveur.'
+            echo
+            echo '### Compatibilite'
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            echo '| EXILED | `${{ steps.proj.outputs.exiled }}` |'
+            echo '| Framework | `net48` |'
+            echo '| Commit | `${{ github.sha }}` |'
+            echo
+            echo '```'
+            echo 'SHA256  ${{ steps.dll.outputs.sha256 }}'
+            echo '```'
+          } > RELEASE_NOTES.md
+
+          cat RELEASE_NOTES.md
+
+      - name: Publier la release
+        if: steps.gate.outputs.release == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version='${{ steps.proj.outputs.version }}'
+          prerelease=''
+          case "$version" in *-*) prerelease='--prerelease' ;; esac
+
+          gh release create '${{ steps.gate.outputs.tag }}' \
+            --target '${{ github.sha }}' \
+            --title '${{ steps.proj.outputs.name }} v${{ steps.proj.outputs.version }}' \
+            --notes-file RELEASE_NOTES.md \
+            $prerelease \
+            'artifacts/${{ steps.proj.outputs.name }}.dll' \
+            'artifacts/SHA256SUMS.txt'
