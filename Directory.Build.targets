@@ -1,0 +1,19 @@
+<Project>
+
+  <PropertyGroup>
+    <GameRefs>$(PkgExiled_Dev_References)\lib\net48</GameRefs>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(PkgExiled_Dev_References)' != '' ">
+    <Reference Include="Assembly-CSharp-firstpass" HintPath="$(GameRefs)\Assembly-CSharp-firstpass.dll" Private="false" />
+    <Reference Include="Mirror" HintPath="$(GameRefs)\Mirror.dll" Private="false" />
+    <Reference Include="Pooling" HintPath="$(GameRefs)\Pooling.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(GameRefs)\UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GameRefs)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GameRefs)\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AudioModule" HintPath="$(GameRefs)\UnityEngine.AudioModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GameRefs)\UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="Unity.TextMeshPro" HintPath="$(GameRefs)\Unity.TextMeshPro.dll" Private="false" />
+  </ItemGroup>
+
+</Project>
