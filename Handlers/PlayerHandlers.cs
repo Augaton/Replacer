@@ -1,5 +1,6 @@
 using System;
 using Exiled.API.Enums;
+using AugatonLib.Text;
 using Exiled.API.Extensions;
 using Exiled.API.Features;
 using Exiled.API.Features.Roles;
@@ -226,9 +227,7 @@ namespace Replacer.Handlers
 
         private void Announce(Player target, PlayerSnapshot snapshot)
         {
-            string nickname = string.IsNullOrEmpty(snapshot.Nickname)
-                ? plugin.Translation.UnknownNickname
-                : snapshot.Nickname;
+            string nickname = SafeText.Sanitize(snapshot.Nickname, SafeText.DefaultMaxLength, plugin.Translation.UnknownNickname);
 
             string hint = plugin.Translation.ReplacedHint
                 .Replace("{nickname}", nickname)
