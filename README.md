@@ -1,5 +1,9 @@
 # Replacer 2.0
 
+
+> Portage EXILED 9.14.2 d'un plugin de **DGvagabond**. Depot non affilie a
+> l'auteur d'origine. Voir [NOTICE.md](NOTICE.md) pour l'attribution.
+
 Remplace un joueur qui quitte la partie par un spectateur.
 
 **EXILED 9.14.2** — `dotnet build -c Release Replacer.csproj`
