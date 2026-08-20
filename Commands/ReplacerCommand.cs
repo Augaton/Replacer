@@ -1,5 +1,5 @@
 using CommandSystem;
-using ZoneShilari.Common.Commands;
+using AugatonLib.Commands;
 
 namespace Replacer.Commands
 {

@@ -40,22 +40,22 @@ Les textes joueur sont dans le fichier de traduction.
 
 ## Dependances
 
-Ce plugin depend de **ZoneShilari.Common**, la bibliotheque partagee de la
+Ce plugin depend de **AugatonLib**, la bibliotheque partagee de la
 collection.
 
 | Fichier | Destination |
 |---|---|
 | `Replacer.dll` | `Plugins/7777/` |
-| `ZoneShilari.Common.dll` | `Plugins/dependencies/` |
+| `AugatonLib.dll` | `Plugins/dependencies/` |
 | HintServiceMeow | `Plugins/7777/` |
 
-`ZoneShilari.Common.dll` ne va **jamais** dans `Plugins/7777/` : EXILED
+`AugatonLib.dll` ne va **jamais** dans `Plugins/7777/` : EXILED
 tenterait de le charger comme plugin. Il doit etre deploye avant ce plugin et
 mis a jour en meme temps.
 
 Pour compiler ce depot isolement, cloner
-[ZoneShilari.Common](https://github.com/Augaton/ZoneShilari.Common) a cote,
-ou passer `-p:CommonProject=chemin/vers/ZoneShilari.Common.csproj`.
+[AugatonLib](https://github.com/Augaton/AugatonLib) a cote,
+ou passer `-p:CommonProject=chemin/vers/AugatonLib.csproj`.
 
 ## Commandes staff
 
