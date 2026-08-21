@@ -1,5 +1,7 @@
 using System;
 using Exiled.API.Enums;
+using AugatonLib.Arbitration;
+using AugatonLib.Bus;
 using AugatonLib.Text;
 using Exiled.API.Extensions;
 using Exiled.API.Features;
@@ -53,6 +55,9 @@ namespace Replacer.Handlers
                 API.HintBridge.Remove(leaver);
 
                 if (!IsReplaceable(leaver))
+                    return;
+
+                if (!DepartureArbiter.IsOwner(leaver, Plugin.DepartureOwner))
                     return;
 
                 PlayerSnapshot snapshot = CaptureSnapshot(leaver);
@@ -215,6 +220,8 @@ namespace Replacer.Handlers
                     }
 
                     Announce(target, snapshot);
+
+                    PluginBus.Publish(BusTopics.PlayerReplaced, Plugin.DepartureOwner, target);
 
                     Log.Info($"{target.Nickname} ({target.UserId}) remplace {snapshot.Nickname} en tant que {snapshot.Role}.");
                 }

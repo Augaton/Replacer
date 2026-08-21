@@ -19,6 +19,8 @@ namespace Replacer.Commands
 
         public override void LoadGeneratedCommands()
         {
+            RegisterCommand(new CollectionCommand(Permission));
+
             RegisterCommand(new StatusCommand(
                 "Replacer",
                 typeof(Plugin), Permission, builder =>

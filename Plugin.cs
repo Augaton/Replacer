@@ -1,6 +1,8 @@
 using System;
 using Exiled.API.Features;
 using Replacer.API;
+using AugatonLib.Arbitration;
+using AugatonLib.Runtime;
 using Replacer.Handlers;
 using PlayerEvents = Exiled.Events.Handlers.Player;
 using ServerEvents = Exiled.Events.Handlers.Server;
@@ -18,6 +20,8 @@ namespace Replacer
         public override Version Version => new Version(2, 0, 0);
 
         public override Version RequiredExiledVersion => new Version(9, 14, 2);
+
+        public const string DepartureOwner = "Replacer";
 
         public static Plugin Instance { get; private set; }
 
@@ -43,6 +47,14 @@ namespace Replacer
             ServerEvents.RoundEnded += OnRoundEnded;
             ServerEvents.RestartingRound += OnRestartingRound;
 
+            DepartureArbiter.Declare(DepartureOwner, 50, player => player is not null);
+
+            PluginDirectory.Register(
+                this,
+                Capability.Hints,
+                Capability.Departure,
+                Capability.Bus);
+
             base.OnEnabled();
         }
 
@@ -57,6 +69,9 @@ namespace Replacer
 
             queue?.Clear();
             API.HintBridge.Clear();
+
+            DepartureArbiter.Withdraw(DepartureOwner);
+            PluginDirectory.Unregister(this);
 
             playerHandlers = null;
             queue = null;
