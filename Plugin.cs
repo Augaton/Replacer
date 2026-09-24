@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Exiled.API.Features;
+using PlayerRoles;
 using Replacer.API;
 using AugatonLib.Arbitration;
 using AugatonLib.Runtime;
@@ -49,6 +51,8 @@ namespace Replacer
 
             DepartureArbiter.Declare(DepartureOwner, 50, player => player is not null);
 
+            ServerEvents.ReloadedConfigs += OnReloadedConfigs;
+
             PluginDirectory.Register(
                 this,
                 Capability.Hints,
@@ -60,8 +64,13 @@ namespace Replacer
 
         public override void OnDisabled()
         {
-            PlayerEvents.Left -= playerHandlers.OnLeft;
-            PlayerEvents.ChangingRole -= playerHandlers.OnChangingRole;
+            if (playerHandlers is not null)
+            {
+                PlayerEvents.Left -= playerHandlers.OnLeft;
+                PlayerEvents.ChangingRole -= playerHandlers.OnChangingRole;
+
+                playerHandlers.Reset();
+            }
 
             ServerEvents.RoundStarted -= OnRoundStarted;
             ServerEvents.RoundEnded -= OnRoundEnded;
@@ -71,6 +80,7 @@ namespace Replacer
             API.HintBridge.Clear();
 
             DepartureArbiter.Withdraw(DepartureOwner);
+            ServerEvents.ReloadedConfigs -= OnReloadedConfigs;
             PluginDirectory.Unregister(this);
 
             playerHandlers = null;
@@ -78,6 +88,18 @@ namespace Replacer
             Instance = null;
 
             base.OnDisabled();
+        }
+
+        private void OnReloadedConfigs()
+        {
+            try
+            {
+                ValidateConfig();
+            }
+            catch (Exception e)
+            {
+                Log.Error($"OnReloadedConfigs: {e}");
+            }
         }
 
         private void ValidateConfig()
@@ -99,6 +121,18 @@ namespace Replacer
                 Log.Warn($"PerPlayerCooldownSeconds ({Config.PerPlayerCooldownSeconds}) est negatif, remis a 0.");
                 Config.PerPlayerCooldownSeconds = 0f;
             }
+
+            if (Config.ReplaceableRoles is null)
+            {
+                Log.Warn("ReplaceableRoles est absent, remis a une liste vide.");
+                Config.ReplaceableRoles = new List<RoleTypeId>();
+            }
+
+            if (Config.IgnoredRoles is null)
+            {
+                Log.Warn("IgnoredRoles est absent, remis a une liste vide.");
+                Config.IgnoredRoles = new List<RoleTypeId>();
+            }
         }
 
         private void OnRoundStarted()
@@ -109,6 +143,11 @@ namespace Replacer
 
         private void OnRoundEnded(Exiled.Events.EventArgs.Server.RoundEndedEventArgs ev) => queue.Clear();
 
-        private void OnRestartingRound() => queue.Clear();
+        private void OnRestartingRound()
+        {
+            queue.Clear();
+            playerHandlers.Reset();
+            API.HintBridge.Clear();
+        }
     }
 }

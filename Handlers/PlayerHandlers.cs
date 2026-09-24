@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Exiled.API.Enums;
 using AugatonLib.Arbitration;
 using AugatonLib.Bus;
@@ -18,6 +19,7 @@ namespace Replacer.Handlers
     {
         private readonly Plugin plugin;
         private readonly SpectatorQueue queue;
+        private readonly List<CoroutineHandle> pendingSnapshots = new List<CoroutineHandle>(4);
 
         public PlayerHandlers(Plugin plugin, SpectatorQueue queue)
         {
@@ -73,6 +75,9 @@ namespace Replacer.Handlers
 
                 queue.MarkReplaced(replacement);
                 ApplySnapshot(replacement, snapshot);
+
+                if (plugin.Config.TransferInventory && !leaver.IsScp && replacement.Role.Type == snapshot.Role)
+                    leaver.ClearInventory();
             }
             catch (Exception e)
             {
@@ -91,7 +96,9 @@ namespace Replacer.Handlers
                 return false;
             }
 
-            if (Player.List.Count < plugin.Config.MinimumPlayers)
+            int remainingPlayers = Player.List.Count - 1;
+
+            if (remainingPlayers < plugin.Config.MinimumPlayers)
                 return false;
 
             RoleTypeId role = player.Role.Type;
@@ -147,7 +154,7 @@ namespace Replacer.Handlers
                     if (type == EffectType.None)
                         continue;
 
-                    snapshot.Effects.Add(new EffectSnapshot(type, effect.Intensity, effect.Duration));
+                    snapshot.Effects.Add(new EffectSnapshot(type, effect.Intensity, effect.Duration == 0f ? 0f : effect.TimeLeft));
                 }
             }
 
@@ -166,9 +173,17 @@ namespace Replacer.Handlers
         {
             string userId = replacement.UserId;
 
-            replacement.Role.Set(snapshot.Role, SpawnReason.Respawn, RoleSpawnFlags.None);
+            RoleSpawnFlags flags = RoleSpawnFlags.None;
 
-            Timing.CallDelayed(plugin.Config.ReplacementDelay, () =>
+            if (!plugin.Config.TransferPosition)
+                flags |= RoleSpawnFlags.UseSpawnpoint;
+
+            if (!plugin.Config.TransferInventory)
+                flags |= RoleSpawnFlags.AssignInventory;
+
+            replacement.Role.Set(snapshot.Role, SpawnReason.Respawn, flags);
+
+            pendingSnapshots.Add(Timing.CallDelayed(plugin.Config.ReplacementDelay, () =>
             {
                 try
                 {
@@ -229,7 +244,15 @@ namespace Replacer.Handlers
                 {
                     Log.Error($"ApplySnapshot: {e}");
                 }
-            });
+            }));
+        }
+
+        public void Reset()
+        {
+            foreach (CoroutineHandle handle in pendingSnapshots)
+                Timing.KillCoroutines(handle);
+
+            pendingSnapshots.Clear();
         }
 
         private void Announce(Player target, PlayerSnapshot snapshot)
